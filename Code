@@ -1,0 +1,80 @@
+#include "main.h"
+#include "dht22.h"
+#include "ssd1306.h"
+#include "fonts.h"
+#include "rfid.h"
+#include <stdio.h>
+
+I2C_HandleTypeDef hi2c1;
+SPI_HandleTypeDef hspi2;
+TIM_HandleTypeDef htim6;
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_I2C1_Init(void);
+static void MX_SPI2_Init(void);
+static void MX_TIM6_Init(void);
+
+int main(void)
+{
+  HAL_Init();
+  SystemClock_Config();
+  MX_GPIO_Init();
+  MX_I2C1_Init();
+  MX_SPI2_Init();
+  MX_TIM6_Init();
+
+  HAL_TIM_Base_Start(&htim6);
+
+  SSD1306_Init();
+  SSD1306_Clear();
+  SSD1306_GotoXY(0, 0);
+  SSD1306_Puts("Initializing...", &Font_7x10, 1);
+  SSD1306_UpdateScreen();
+
+  MFRC522_Init();
+
+  float temperature = 0.0f;
+  float humidity = 0.0f;
+  uint8_t uid[5];
+  char buffer[32];
+
+  while (1)
+  {
+    if (DHT22_Read(&temperature, &humidity) == HAL_OK)
+    {
+      SSD1306_Clear();
+      SSD1306_GotoXY(0, 0);
+      sprintf(buffer, "Temp: %.1f C", temperature);
+      SSD1306_Puts(buffer, &Font_7x10, 1);
+      SSD1306_GotoXY(0, 12);
+      sprintf(buffer, "Hum:  %.1f %%", humidity);
+      SSD1306_Puts(buffer, &Font_7x10, 1);
+    }
+    else
+    {
+      SSD1306_Clear();
+      SSD1306_GotoXY(0, 0);
+      SSD1306_Puts("DHT22 Error", &Font_7x10, 1);
+    }
+
+    if (MFRC522_Check(uid) == MI_OK)
+    {
+      SSD1306_GotoXY(0, 24);
+      SSD1306_Puts("RFID Detected", &Font_7x10, 1);
+      SSD1306_GotoXY(0, 36);
+      sprintf(buffer, "UID: %02X%02X%02X%02X",
+              uid[0], uid[1], uid[2], uid[3]);
+      SSD1306_Puts(buffer, &Font_7x10, 1);
+    }
+    else
+    {
+      SSD1306_GotoXY(0, 24);
+      SSD1306_Puts("No RFID Tag", &Font_7x10, 1);
+    }
+
+    SSD1306_UpdateScreen();
+    HAL_Delay(2000);
+  }
+}
+
